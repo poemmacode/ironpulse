@@ -22,11 +22,12 @@ model User {
 }
 
 model Exercise {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  category    String
-  targetGroup String
-  workoutSets WorkoutSet[]
+  id            String         @id @default(cuid())
+  name          String         @unique
+  category      String
+  targetGroup   String
+  workoutSets   WorkoutSet[]
+  personalBests PersonalBest[]
 }
 
 model Workout {
@@ -59,6 +60,7 @@ model PersonalBest {
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
   weightKg   Float
   reps       Int
   achievedAt DateTime @default(now())
