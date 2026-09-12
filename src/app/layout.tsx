@@ -23,7 +23,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "IronPulse",
-  description: "Progressive overload & gamified fitness engine",
+  description: "Progressive overload & gamified fitness engine — track workouts, earn XP, level up",
   manifest: "/manifest.json",
 };
 
