@@ -2,8 +2,8 @@ import Card, { CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import Badge from "@/components/ui/badge";
 
 interface WorkoutSet {
-  setNumber: number;
-  weightKg: number;
+  set_number: number;
+  weight_kg: number;
   reps: number;
   rir: number | null;
   exercise: { name: string; category: string };
@@ -11,9 +11,9 @@ interface WorkoutSet {
 
 interface Workout {
   id: string;
-  totalVolume: number;
-  xpEarned: number;
-  createdAt: string;
+  total_volume: number;
+  xp_earned: number;
+  created_at: string;
   notes: string | null;
   sets: WorkoutSet[];
 }
@@ -45,7 +45,7 @@ export default function WorkoutSummary({ workout }: WorkoutSummaryProps) {
       workout.sets.map((s) => [s.exercise.name, s.exercise.name])
     ).values()
   );
-  const date = new Date(workout.createdAt).toLocaleDateString("en-US", {
+  const date = new Date(workout.created_at).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
   });
@@ -79,9 +79,9 @@ export default function WorkoutSummary({ workout }: WorkoutSummaryProps) {
       <CardFooter>
         <div className="flex w-full justify-between text-sm">
           <span className="text-zinc-500 dark:text-zinc-400">
-            Volume: {workout.totalVolume.toLocaleString()} kg
+            Volume: {workout.total_volume.toLocaleString()} kg
           </span>
-          <Badge variant="success">+{workout.xpEarned} XP</Badge>
+          <Badge variant="success">+{workout.xp_earned} XP</Badge>
         </div>
       </CardFooter>
     </Card>

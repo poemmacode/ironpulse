@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
@@ -13,21 +12,24 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const profile = await prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        level: true,
-        currentXp: true,
-        targetXp: true,
-        streakDays: true,
-        createdAt: true,
+    const { data: profile, error } = await supabase
+      .from("users")
+      .select("id, email, name, level, current_xp, target_xp, streak_days, created_at")
+      .eq("id", user.id)
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      profile: {
+        ...profile,
+        currentXp: profile.current_xp,
+        targetXp: profile.target_xp,
+        streakDays: profile.streak_days,
       },
     });
-
-    return NextResponse.json({ profile });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

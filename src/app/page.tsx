@@ -18,8 +18,8 @@ interface Profile {
 }
 
 interface WorkoutSet {
-  setNumber: number;
-  weightKg: number;
+  set_number: number;
+  weight_kg: number;
   reps: number;
   rir: number | null;
   exercise: { name: string; category: string };
@@ -27,9 +27,9 @@ interface WorkoutSet {
 
 interface Workout {
   id: string;
-  totalVolume: number;
-  xpEarned: number;
-  createdAt: string;
+  total_volume: number;
+  xp_earned: number;
+  created_at: string;
   notes: string | null;
   sets: WorkoutSet[];
 }

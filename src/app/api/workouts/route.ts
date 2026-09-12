@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 import { calculateEstimated1RM } from "@/lib/engine/brzycki";
 import { calcVolumeXP, checkLevelUp } from "@/lib/engine/gamification";
@@ -33,16 +32,15 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const workouts = await prisma.workout.findMany({
-      where: { userId: user.id },
-      include: {
-        sets: {
-          include: { exercise: true },
-          orderBy: { setNumber: "asc" },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const { data: workouts, error } = await supabase
+      .from("workouts")
+      .select("*, sets:workout_sets(*, exercise:exercises(*))")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ workouts });
   } catch {
@@ -76,10 +74,19 @@ export async function POST(request: NextRequest) {
 
     const { exercises, notes } = parsed.data;
 
+    // Resolve exercises from DB
     const exerciseNames = exercises.map((e) => e.name);
-    const dbExercises = await prisma.exercise.findMany({
-      where: { name: { in: exerciseNames } },
-    });
+    const { data: dbExercises, error: exError } = await supabase
+      .from("exercises")
+      .select("*")
+      .in("name", exerciseNames);
+
+    if (exError || !dbExercises) {
+      return NextResponse.json(
+        { error: "Failed to fetch exercises" },
+        { status: 500 }
+      );
+    }
 
     const exerciseMap = new Map(dbExercises.map((e) => [e.name, e]));
 
@@ -88,22 +95,20 @@ export async function POST(request: NextRequest) {
     );
     if (missingExercises.length > 0) {
       return NextResponse.json(
-        {
-          error: "Unknown exercises",
-          details: missingExercises,
-        },
+        { error: "Unknown exercises", details: missingExercises },
         { status: 400 }
       );
     }
 
+    // Build sets data
     const allSets: Array<{ weightKg: number; reps: number }> = [];
     const workoutSetsData: Array<{
-      exerciseId: string;
-      setNumber: number;
-      weightKg: number;
+      exercise_id: string;
+      set_number: number;
+      weight_kg: number;
       reps: number;
       rir: number | null;
-      estimated1RM: number;
+      estimated_1rm: number;
     }> = [];
 
     for (const exercise of exercises) {
@@ -113,61 +118,83 @@ export async function POST(request: NextRequest) {
         const estimated1RM = calculateEstimated1RM(set.weight_kg, set.reps);
         allSets.push({ weightKg: set.weight_kg, reps: set.reps });
         workoutSetsData.push({
-          exerciseId: dbExercise.id,
-          setNumber: set.set_number,
-          weightKg: set.weight_kg,
+          exercise_id: dbExercise.id,
+          set_number: set.set_number,
+          weight_kg: set.weight_kg,
           reps: set.reps,
           rir: set.rir ?? null,
-          estimated1RM,
+          estimated_1rm: estimated1RM,
         });
       }
     }
 
     const { volumeLoad, xpEarned } = calcVolumeXP(allSets);
 
-    const userProfile = await prisma.user.findUniqueOrThrow({
-      where: { id: user.id },
-    });
+    // Get user profile for level check
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("level, current_xp, target_xp")
+      .eq("id", user.id)
+      .single();
+
+    if (!userProfile) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
     const levelCheck = checkLevelUp(
       userProfile.level,
-      userProfile.currentXp,
-      userProfile.targetXp,
+      userProfile.current_xp,
+      userProfile.target_xp,
       xpEarned
     );
 
-    const [workout] = await prisma.$transaction([
-      prisma.workout.create({
-        data: {
-          userId: user.id,
-          rawInput: JSON.stringify(body),
-          notes: notes ?? null,
-          totalVolume: volumeLoad,
-          xpEarned,
-          sets: {
-            create: workoutSetsData,
-          },
-        },
-        include: {
-          sets: {
-            include: { exercise: true },
-            orderBy: { setNumber: "asc" },
-          },
-        },
-      }),
-      prisma.user.update({
-        where: { id: user.id },
-        data: {
-          level: levelCheck.newLevel,
-          currentXp: levelCheck.remainingXp,
-          targetXp: levelCheck.newTargetXp,
-        },
-      }),
-    ]);
+    // Create workout
+    const { data: workout, error: workoutError } = await supabase
+      .from("workouts")
+      .insert({
+        user_id: user.id,
+        raw_input: JSON.stringify(body),
+        notes: notes ?? null,
+        total_volume: volumeLoad,
+        xp_earned: xpEarned,
+      })
+      .select()
+      .single();
+
+    if (workoutError) {
+      return NextResponse.json(
+        { error: workoutError.message },
+        { status: 500 }
+      );
+    }
+
+    // Insert sets
+    const setsWithWorkoutId = workoutSetsData.map((s) => ({
+      ...s,
+      workout_id: workout.id,
+    }));
+
+    const { error: setsError } = await supabase
+      .from("workout_sets")
+      .insert(setsWithWorkoutId);
+
+    if (setsError) {
+      return NextResponse.json({ error: setsError.message }, { status: 500 });
+    }
+
+    // Update user level
+    await supabase
+      .from("users")
+      .update({
+        level: levelCheck.newLevel,
+        current_xp: levelCheck.remainingXp,
+        target_xp: levelCheck.newTargetXp,
+      })
+      .eq("id", user.id);
 
     return NextResponse.json(
       {
-        workout,
+        workout: { ...workout, sets: setsWithWorkoutId },
         xpEarned,
         levelUp: levelCheck.leveledUp
           ? {

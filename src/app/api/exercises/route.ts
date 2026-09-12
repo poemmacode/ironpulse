@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
@@ -13,9 +12,14 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const exercises = await prisma.exercise.findMany({
-      orderBy: { name: "asc" },
-    });
+    const { data: exercises, error } = await supabase
+      .from("exercises")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ exercises });
   } catch {

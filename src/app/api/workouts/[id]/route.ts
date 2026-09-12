@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(
@@ -18,17 +17,15 @@ export async function GET(
 
     const { id } = await params;
 
-    const workout = await prisma.workout.findFirst({
-      where: { id, userId: user.id },
-      include: {
-        sets: {
-          include: { exercise: true },
-          orderBy: { setNumber: "asc" },
-        },
-      },
-    });
+    const { data: workout, error } = await supabase
+      .from("workouts")
+      .select("*, sets:workout_sets(*, exercise:exercises(*))")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .order("set_number", { foreignTable: "workout_sets", ascending: true })
+      .single();
 
-    if (!workout) {
+    if (error || !workout) {
       return NextResponse.json({ error: "Workout not found" }, { status: 404 });
     }
 

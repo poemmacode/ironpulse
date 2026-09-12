@@ -9,23 +9,23 @@ import Card, { CardContent } from "@/components/ui/card";
 import Badge from "@/components/ui/badge";
 
 interface WorkoutSet {
-  exerciseId: string;
+  exercise_id: string;
   exercise: { name: string; category: string };
-  weightKg: number;
+  weight_kg: number;
   reps: number;
 }
 
 interface Workout {
-  totalVolume: number;
-  xpEarned: number;
+  total_volume: number;
+  xp_earned: number;
   sets: WorkoutSet[];
 }
 
 interface PersonalBest {
   id: string;
-  weightKg: number;
+  weight_kg: number;
   reps: number;
-  achievedAt: string;
+  achieved_at: string;
   exercise: { name: string; category: string };
 }
 
@@ -69,7 +69,7 @@ export default function StatsPage() {
       for (const s of w.sets) {
         const cat = s.exercise.category;
         const existing = map.get(cat) ?? { totalVolume: 0, workoutCount: 0 };
-        existing.totalVolume += s.weightKg * s.reps;
+        existing.totalVolume += s.weight_kg * s.reps;
         existing.workoutCount += 1;
         map.set(cat, existing);
       }
@@ -84,7 +84,7 @@ export default function StatsPage() {
     const map = new Map<string, WorkoutSet>();
     for (const w of workouts) {
       for (const s of w.sets) {
-        map.set(s.exerciseId, s);
+        map.set(s.exercise_id, s);
       }
     }
     return Array.from(map.values());
@@ -114,9 +114,9 @@ export default function StatsPage() {
             </h2>
             {latestExercises.map((s) => (
               <ProgressionCard
-                key={s.exerciseId}
+                key={s.exercise_id}
                 exerciseName={s.exercise.name}
-                currentWeight={s.weightKg}
+                currentWeight={s.weight_kg}
                 previousWeight={null}
                 estimated1RM={null}
                 lastDate={new Date().toISOString()}
@@ -145,7 +145,7 @@ export default function StatsPage() {
                         {pb.reps} reps
                       </p>
                     </div>
-                    <Badge variant="success">{pb.weightKg} kg</Badge>
+                      <Badge variant="success">{pb.weight_kg} kg</Badge>
                   </div>
                 ))}
               </div>
